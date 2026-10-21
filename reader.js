@@ -71,7 +71,7 @@
     '#nr-body{flex:1;overflow-y:auto;padding:16px;line-height:1.8}' +
     '#nr-body p{margin:0 0 1em;padding:4px 6px;border-radius:6px}' +
     '#nr-body p.on{background:#2b3a55;color:#fff}' +
-    '#nr-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:#000;border-top:1px solid #333}' +
+    '#nr-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:#000;border-top:1px solid #333}' +
     '#nr-bar button{font-size:20px;min-height:58px;border:0;border-radius:10px;background:#333;color:#fff;font-weight:600}' +
     '#nr-bar button.big{background:#ffd75e;color:#000}' +
     '#nr-start{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);padding:24px}' +
@@ -83,17 +83,19 @@
     '<button data-a="prev" aria-label="上一段">上一段</button><button data-a="play" class="big" aria-label="播放或暫停">暫停</button>' +
     '<button data-a="next" aria-label="下一段">下一段</button><button data-a="close" aria-label="關閉朗讀">關閉</button>' +
     '<button data-a="slow" aria-label="唸慢一點">慢一點</button><button data-a="fast" aria-label="唸快一點">快一點</button>' +
-    '<button data-a="small" aria-label="字變小">字小</button><button data-a="large" aria-label="字變大">字大</button></div>';
+    '<button data-a="small" aria-label="字變小">字小</button><button data-a="large" aria-label="字變大">字大</button><button data-a="voice" aria-label="換聲音">換聲音</button></div>';
   document.body.appendChild(box);
   var top = box.querySelector('#nr-top'), body = box.querySelector('#nr-body'), playBtn = box.querySelector('[data-a=play]');
 
   var rate = parseFloat(store('nr-rate')) || 1.1, font = parseInt(store('nr-font'), 10) || 26;
-  var ch = null, nextP = null, pi = 0, ci = 0, cks = [], playing = true, token = 0, wake = null, voice = null, busy = false, sayAt = 0;
+  var ch = null, nextP = null, pi = 0, ci = 0, cks = [], playing = true, token = 0, wake = null, voice = null, voices = [], busy = false, sayAt = 0;
   var synth = window.speechSynthesis;
 
   function pickVoice() {
     var vs = synth.getVoices();
-    voice = vs.find(function (v) { return /zh[-_]TW/i.test(v.lang); }) || vs.find(function (v) { return /zh/i.test(v.lang); }) || null;
+    voices = vs.filter(function (v) { return /zh[-_]TW/i.test(v.lang); }).concat(vs.filter(function (v) { return /zh|cmn|yue/i.test(v.lang) && !/zh[-_]TW/i.test(v.lang); }));
+    var saved = store('nr-voice');
+    voice = voices.find(function (v) { return v.name === saved; }) || voices[0] || null;
   }
   pickVoice(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = pickVoice;
 
@@ -199,6 +201,13 @@
     if (a === 'prev') go(pi - 1);
     if (a === 'next') go(pi + 1);
     if (a === 'slow' || a === 'fast') { rate = Math.max(0.5, Math.min(2.5, rate + (a === 'fast' ? 0.1 : -0.1))); store('nr-rate', rate); status(); if (playing) go(pi); }
+    if (a === 'voice') {
+      if (!voices.length) { status('這支手機沒有其他中文聲音'); return; }
+      var vi = (voices.indexOf(voice) + 1) % voices.length; voice = voices[vi]; store('nr-voice', voice.name);
+      status('聲音 ' + (vi + 1) + '/' + voices.length + '：' + voice.name);
+      if (playing) go(pi); else say('這是第' + (vi + 1) + '個聲音，聽聽看喜不喜歡。', function () {});
+      return;
+    }
     if (a === 'small' || a === 'large') { font = Math.max(16, Math.min(48, font + (a === 'large' ? 2 : -2))); store('nr-font', font); applyFont(); }
     if (a === 'close') { pause(); box.style.display = 'none'; }
   };
