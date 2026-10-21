@@ -10,7 +10,7 @@
 ## 書籤代碼
 
 ```
-javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://cdn.jsdelivr.net/gh/peter102831/novel-reader@main/reader.min.js',function(){L('https://raw.githack.com/peter102831/novel-reader/main/reader.min.js')})})()
+javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://cdn.jsdelivr.net/gh/peter102831/Novel-reader@main/reader.min.js',function(){L('https://raw.githack.com/peter102831/Novel-reader/main/reader.min.js')})})()
 ```
 
 `reader.js` 是原始碼，`reader.min.js` 是書籤實際載入的版本。書籤先從 jsDelivr 載入，失敗時改用 raw.githack.com。
