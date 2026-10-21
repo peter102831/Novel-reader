@@ -87,14 +87,22 @@
     '#nr-start{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.85);padding:24px}' +
     '#nr-start button{width:100%;max-width:420px;min-height:40vh;font-size:40px;font-weight:800;border:0;border-radius:24px;background:#ffd75e;color:#000;line-height:1.4}';
 
-  var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-  var box = document.createElement('div'); box.id = 'nr';
+  // The UI lives in its own iframe: clicks inside it never reach the novel site's
+  // page-wide click listeners, which is how its ad scripts open pop-ups.
+  var frame = document.createElement('iframe');
+  frame.id = 'nr-frame'; frame.title = '小說朗讀';
+  frame.setAttribute('style', 'position:fixed;top:0;left:0;width:100%;height:100%;border:0;margin:0;padding:0;z-index:2147483647;background:#111;display:block');
+  document.body.appendChild(frame);
+  var fdoc = frame.contentDocument;
+  fdoc.open(); fdoc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'); fdoc.close();
+  var st = fdoc.createElement('style'); st.textContent = 'html,body{margin:0;height:100%;background:#111}' + css; fdoc.head.appendChild(st);
+  var box = fdoc.createElement('div'); box.id = 'nr';
   box.innerHTML = '<div id="nr-start"><button type="button" aria-label="開始朗讀">▶<br>點這裡<br>開始朗讀</button></div><div id="nr-top" aria-live="polite"></div><div id="nr-body"></div><div id="nr-bar">' +
     '<button data-a="prev" aria-label="上一段">上一段</button><button data-a="play" class="big" aria-label="播放或暫停">暫停</button>' +
     '<button data-a="next" aria-label="下一段">下一段</button><button data-a="close" aria-label="關閉朗讀">關閉</button>' +
     '<button data-a="slow" aria-label="唸慢一點">慢一點</button><button data-a="fast" aria-label="唸快一點">快一點</button>' +
     '<button data-a="small" aria-label="字變小">字小</button><button data-a="large" aria-label="字變大">字大</button><button data-a="voice" aria-label="換聲音">換聲音</button></div>';
-  document.body.appendChild(box);
+  fdoc.body.appendChild(box);
   var top = box.querySelector('#nr-top'), body = box.querySelector('#nr-body'), playBtn = box.querySelector('[data-a=play]');
 
   var rate = parseFloat(store('nr-rate')) || 1.1, font = parseInt(store('nr-font'), 10) || 26;
@@ -249,7 +257,7 @@
   function render() {
     body.innerHTML = '';
     ch.paras.forEach(function (t, i) {
-      var p = document.createElement('p'); p.textContent = t;
+      var p = fdoc.createElement('p'); p.textContent = t;
       p.onclick = function () { go(i); };
       body.appendChild(p);
     });
@@ -316,10 +324,13 @@
       return;
     }
     if (a === 'small' || a === 'large') { font = Math.max(16, Math.min(48, font + (a === 'large' ? 2 : -2))); store('nr-font', font); applyFont(); }
-    if (a === 'close') { pause(); box.style.display = 'none'; }
+    if (a === 'close') { pause(); frame.style.display = 'none'; }
   };
 
-  window.__novelReader = { show: function () { box.style.display = 'flex'; } };
+  window.__novelReader = { show: function () { frame.style.display = 'block'; } };
+  // Extra guard: while the reader is open, the page may not open new windows.
+  var realOpen = window.open;
+  try { window.open = function () { return frame.style.display === 'none' ? realOpen.apply(window, arguments) : null; }; } catch (e) {}
   applyFont();
   ch = extract(document, location.href);
   if (!ch.paras.length) { top.textContent = '這個頁面找不到小說正文'; return; }

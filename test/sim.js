@@ -11,6 +11,9 @@ w.Audio=function(){const a={paused:true,_u:{},getAttribute(k){return this._u[k]|
 w.SpeechSynthesisUtterance=function(t){this.text=t};
 w.speechSynthesis={getVoices:()=>[],cancel(){},speak(u){spoken.push(u.text);setTimeout(()=>u.onend&&u.onend(),0)}};
 w.Element.prototype.scrollIntoView=function(){};
+let opened=0;w.open=()=>{opened++;return null};
 w.eval(fs.readFileSync(require('path').join(__dirname,'..','reader.js'),'utf8'));
-w.document.querySelector('#nr-start button').click();
-setTimeout(()=>{console.log('PLAYED',played.length,played.map(s=>s.slice(0,14)));console.log('SPOKEN',spoken.length,spoken.map(s=>s.slice(0,14)));console.log('TTS requests',ttsReq.length,'unique',new Set(ttsReq).size);console.log('TOP:',w.document.getElementById('nr-top').textContent);console.log('URL:',w.location.href)},1500);
+const fd=w.document.getElementById('nr-frame').contentDocument;
+fd.defaultView.Element.prototype.scrollIntoView=function(){};
+fd.querySelector('#nr-start button').click();
+setTimeout(()=>{console.log('PLAYED',played.length,played.map(s=>s.slice(0,14)));console.log('SPOKEN',spoken.length,spoken.map(s=>s.slice(0,14)));console.log('TTS requests',ttsReq.length,'unique',new Set(ttsReq).size);console.log('TOP:',fd.getElementById('nr-top').textContent);console.log('URL:',w.location.href);fd.body.click();w.open('https://ad.example');console.log('POPUPS while open:',opened)},1500);
