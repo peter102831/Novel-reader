@@ -57,8 +57,13 @@
     if (next && (next === url || /\/(dir|index)?(\.html?)?$/i.test(next) || /\/dir/i.test(next))) next = null;
     var h = doc.querySelector('h1');
     var title = fix((h ? h.textContent : doc.title) || '').trim();
-    var items = [];
-    paras.forEach(function (t, pIdx) { chunks(t, 300).forEach(function (s) { items.push({ p: pIdx, t: s }); }); });
+    var items = [], cur = null;
+    paras.forEach(function (t, pIdx) {
+      chunks(t, 300).forEach(function (s) {
+        if (cur && cur.t.length + s.length + 1 <= 300) { cur.t += '\n' + s; cur.p2 = pIdx; }
+        else { cur = { p: pIdx, p2: pIdx, t: s }; items.push(cur); }
+      });
+    });
     return { url: url, title: title, paras: paras, items: items, next: next };
   }
 
@@ -107,7 +112,14 @@
   pickVoice(); if (synth && synth.onvoiceschanged !== undefined) synth.onvoiceschanged = pickVoice;
 
   // ---------- audio ----------
-  var player = new Audio(); player.preload = 'auto';
+  var players = [new Audio(), new Audio()], pc = 0, player = players[0];
+  players.forEach(function (a) { a.preload = 'auto'; });
+  function preloadNext(url) {
+    var other = players[1 - pc];
+    if (other.getAttribute('data-u') === url) return;
+    other.setAttribute('data-u', url); other.src = url;
+    try { other.load(); } catch (e) {}
+  }
   var cache = new Map();
   function pct() { var n = Math.round((rate - 1) * 100); return (n >= 0 ? '+' : '') + n + '%'; }
   function audioFor(text) {
@@ -131,9 +143,13 @@
   }
   function prefetch() {
     if (!cloud || !ch) return;
-    for (var k = 1; k <= 2; k++) {
+    for (var k = 1; k <= 4; k++) {
       var j = idx + k;
-      if (j < ch.items.length) audioFor(ch.items[j].t).catch(function () {});
+      if (j < ch.items.length) {
+        var pr = audioFor(ch.items[j].t);
+        if (k === 1) pr.then(function (u) { if (!player.paused || loading) preloadNext(u); }).catch(function () {});
+        else pr.catch(function () {});
+      }
       else if (nextCh && nextCh.items[j - ch.items.length]) audioFor(nextCh.items[j - ch.items.length].t).catch(function () {});
     }
   }
@@ -156,16 +172,21 @@
     var my = ++token; sayAt = Date.now();
     var finish = function () { if (my === token && playing) done(); };
     if (synth) synth.cancel();
-    player.pause();
-    if (!cloud) { deviceSay(text, my, finish); return; }
+    if (!cloud) { player.pause(); deviceSay(text, my, finish); return; }
     loading = true;
     audioFor(text).then(function (url) {
       loading = false;
       if (my !== token || !playing) return;
       cloudFails = 0;
+      var old = player;
+      if (players[1 - pc].getAttribute('data-u') === url) { pc = 1 - pc; player = players[pc]; }
+      old.onended = old.onerror = null;
+      if (old !== player) old.pause();
       player.onended = finish;
       player.onerror = function () { if (my === token) deviceSay(text, my, finish); };
-      player.src = url; player.playbackRate = 1;
+      if (player.getAttribute('data-u') !== url) { player.setAttribute('data-u', url); player.src = url; }
+      else { try { player.currentTime = 0; } catch (e) {} }
+      player.playbackRate = 1;
       var pp = player.play();
       if (pp) pp.catch(function () { if (my === token) deviceSay(text, my, finish); });
       sayAt = Date.now();
@@ -210,12 +231,12 @@
       ms.playbackState = playing ? 'playing' : 'paused';
       ms.setActionHandler('play', function () { go(curP()); });
       ms.setActionHandler('pause', pause);
-      ms.setActionHandler('nexttrack', function () { go(curP() + 1); });
-      ms.setActionHandler('previoustrack', function () { go(curP() - 1); });
+      ms.setActionHandler('nexttrack', function () { goItem(idx + 1); });
+      ms.setActionHandler('previoustrack', function () { goItem(idx - 1); });
     } catch (e) {}
   }
   function pause() {
-    playing = false; token++; if (synth) synth.cancel(); player.pause(); keep.pause(); playBtn.textContent = '播放'; media();
+    playing = false; token++; if (synth) synth.cancel(); players.forEach(function (a) { a.pause(); }); keep.pause(); playBtn.textContent = '播放'; media();
     if (wake) wake.release().catch(function () {});
   }
 
@@ -241,10 +262,10 @@
 
   var lastMarked = -1;
   function mark() {
-    var p = curP(); if (p === lastMarked) return; lastMarked = p;
+    var it = ch.items[idx]; if (!it || idx === lastMarked) return; lastMarked = idx;
     var ps = body.children;
-    for (var i = 0; i < ps.length; i++) ps[i].className = i === p ? 'on' : '';
-    if (ps[p]) ps[p].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    for (var i = 0; i < ps.length; i++) ps[i].className = (i >= it.p && i <= it.p2) ? 'on' : '';
+    if (ps[it.p]) ps[it.p].scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   function step() {
@@ -271,16 +292,17 @@
 
   function go(p) {
     p = Math.max(0, Math.min(p, ch.paras.length - 1));
-    idx = 0; while (idx < ch.items.length - 1 && ch.items[idx].p < p) idx++;
+    idx = 0; while (idx < ch.items.length - 1 && ch.items[idx].p2 < p) idx++;
     lastMarked = -1; playing = true; playBtn.textContent = '暫停';
     keepAwake(); keep.play().catch(function () {}); media(); step();
   }
 
+  function goItem(i) { i = Math.max(0, Math.min(i, ch.items.length - 1)); go(ch.items[i].p); idx = i; }
   box.querySelector('#nr-bar').onclick = function (e) {
     var a = e.target.getAttribute('data-a'); if (!a) return;
     if (a === 'play') { if (playing) pause(); else go(curP()); }
-    if (a === 'prev') go(curP() - 1);
-    if (a === 'next') go(curP() + 1);
+    if (a === 'prev') goItem(idx - 1);
+    if (a === 'next') goItem(idx + 1);
     if (a === 'slow' || a === 'fast') { rate = Math.round(Math.max(0.5, Math.min(2, rate + (a === 'fast' ? 0.1 : -0.1))) * 10) / 10; store('nr-rate', rate); status(); if (playing) go(curP()); }
     if (a === 'voice') {
       if (cloud) {
