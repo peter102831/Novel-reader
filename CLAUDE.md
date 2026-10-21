@@ -40,6 +40,7 @@ javascript:(function(){function L(u,f){var s=document.createElement('script');s.
 - jsDelivr 的 `@main` 會快取約 12 小時，raw.githack.com 不同節點也會給舊版，所以改由自己的 Worker 提供程式。
 - **提莫書屋的反爬機制**：大約 149 個常用字在 HTML 裡被換成韓文字（例如 누＝到、귷＝八），網站再用自訂字型 `bqg`（/fonts/f24092.woff2）把它們畫成中文。對照表 `FIXS` 是把字型裡每個字形和系統中文字型逐字比對、再用上下文和字形點陣人工確認得出的。如果網站換了字型檔，正文會出現怪字或漏字，就要重新做這個比對。
 - 長段落切成最多 300 字，相鄰短段落合併成一次請求；兩個 Audio 輪流預載，並預先抓 4 段，段落間隔實測約 2～7 毫秒。
+- **網站的彈窗廣告**：廣告程式監聽整個網頁的點擊，原本點朗讀畫面也會觸發彈窗。現在朗讀介面放在同源的 iframe（`#nr-frame`）裡，點擊不會傳到網頁；朗讀畫面開著時也會擋掉 `window.open`。實測：真實點擊開始按鈕後，網頁的 pointerdown/touchstart/mousedown 監聽器一次都沒收到。介面的 DOM 要用 `fdoc` 建立，不能用 `document`。
 - 背景播放：另外循環播放一段幾乎無聲的音檔，讓頁面不被系統暫停；並設定 Media Session，鎖定畫面可以控制播放。
 
 ## 風險與備案
