@@ -1,3 +1,4 @@
+import CORE from '../reader.core.js';
 // Edge TTS proxy for the novel reader. Deployed as a Cloudflare Worker.
 // Optional: set a secret ACCESS_KEY in Cloudflare to require ?key=...
 // GET  /tts?text=...&voice=zh-TW-HsiaoChenNeural&rate=%2B0%25  -> audio/mpeg
@@ -193,6 +194,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const url = new URL(request.url);
     if (url.pathname === '/') return new Response('ok', { headers: CORS });
+    if (url.pathname === '/reader.js') return new Response(CORE, { headers: Object.assign({ 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store' }, CORS) });
     if (url.pathname !== '/tts') return new Response('not found', { status: 404, headers: CORS });
     let p = Object.fromEntries(url.searchParams);
     if (request.method === 'POST') { try { p = Object.assign(p, await request.json()); } catch (e) {} }
