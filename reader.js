@@ -1,12 +1,15 @@
 (function () {
   if (window.__novelReader) { window.__novelReader.show(); return; }
 
+  var TTS_URL = 'https://novel-reader.a1028318.workers.dev/tts';
+  var CLOUD_VOICES = [['zh-TW-HsiaoChenNeural', '曉臻（女聲）'], ['zh-TW-HsiaoYuNeural', '曉雨（女聲）'], ['zh-TW-YunJheNeural', '雲哲（男聲）']];
+
   var FIX = {}, FIXS = '괗二굛十굜丁궝七귷八그人극入깇九깊了꺅刀꺆力꺗又꺘三꺛干꺱土꺲工꺳才꺴寸꺵丈꺶大껗上께小껙口껚山껛巾껜千껡亡껣之껥已껦弓껧己껩也꼆乞꼇川꼊么꼋久꼌勺꼍丸꼎凡꼐及꽗叉꽬夫꽭天꽮元꽱扎꾉五꾊支꾦犬꾨尤꾩匹꾫巨꾬牙꾭屯꾮互꾿切꿀止꿁少꿂日꿗中꿛手꿢午꿤升꿦仁꿧片꿨化꿩仇꿫仍꿭斤꿮爪꿯反꿰介꿵父꿷今꿸凶꿹乏꿻氏뀐欠뀑丹뀔勾뀖六뀗文뀘方뀙火뀞心뀟尺뀧巴뀪以뀫允뀬予냪幻냫玉냬末냭未녈打녉巧녊正녌功녍扔녠甘녡世녢古녤本녦可녧丙녨左녪石녿右놀布놂平놅的놆是놇在놊不놋有놌和놖我놘由놙只놚要놛他뇽叫뇾用눁四눂失눃生누到눑代눒作눓地눕出늀就늁分늂乎늄令늅成늉句늌外늳冬늵包덿主뎀市뎃年돗它땡百땢同땣能땤而떘下떚子';
   for (var fi = 0; fi < FIXS.length; fi += 2) FIX[FIXS[fi]] = FIXS[fi + 1];
   var JUNK = /溫馨提示|网站即将改版|網站即將改版|及時保存|及时保存|請記住本站|请记住本站|本章未完|點擊下一頁|点击下一页/;
   var NEXT = /^\s*下一[章頁页节節]\s*$/;
 
-  function fix(s) { return s.replace(/[\uAC00-\uD7AF]/g, function (c) { return FIX[c] || ''; }); }
+  function fix(s) { return s.replace(/[가-힯]/g, function (c) { return FIX[c] || ''; }); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 
   function textLen(el) {
@@ -17,6 +20,15 @@
       else if (c.nodeName === 'P') n += c.textContent.trim().length;
     }
     return n;
+  }
+
+  function chunks(p, max) {
+    var out = [], parts = p.match(/[^。！？!?；;…]+[。！？!?；;…」』”]*/g) || [p], buf = '';
+    parts.forEach(function (s) {
+      if ((buf + s).length > max && buf) { out.push(buf); buf = s; } else buf += s;
+    });
+    if (buf) out.push(buf);
+    return out;
   }
 
   function extract(doc, url) {
@@ -45,7 +57,9 @@
     if (next && (next === url || /\/(dir|index)?(\.html?)?$/i.test(next) || /\/dir/i.test(next))) next = null;
     var h = doc.querySelector('h1');
     var title = fix((h ? h.textContent : doc.title) || '').trim();
-    return { url: url, title: title, paras: paras, next: next };
+    var items = [];
+    paras.forEach(function (t, pIdx) { chunks(t, 300).forEach(function (s) { items.push({ p: pIdx, t: s }); }); });
+    return { url: url, title: title, paras: paras, items: items, next: next };
   }
 
   function load(url) {
@@ -55,15 +69,6 @@
     }).then(function (html) {
       return extract(new DOMParser().parseFromString(html, 'text/html'), url);
     });
-  }
-
-  function chunks(p) {
-    var out = [], parts = p.match(/[^。！？!?；;…]+[。！？!?；;…」』”]*/g) || [p], buf = '';
-    parts.forEach(function (s) {
-      if ((buf + s).length > 120 && buf) { out.push(buf); buf = s; } else buf += s;
-    });
-    if (buf) out.push(buf);
-    return out;
   }
 
   var css = '#nr{position:fixed;inset:0;z-index:2147483647;background:#111;color:#f2f2f2;display:flex;flex-direction:column;font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif}' +
@@ -88,26 +93,91 @@
   var top = box.querySelector('#nr-top'), body = box.querySelector('#nr-body'), playBtn = box.querySelector('[data-a=play]');
 
   var rate = parseFloat(store('nr-rate')) || 1.1, font = parseInt(store('nr-font'), 10) || 26;
-  var ch = null, nextP = null, pi = 0, ci = 0, cks = [], playing = true, token = 0, wake = null, voice = null, voices = [], busy = false, sayAt = 0;
-  var synth = window.speechSynthesis;
+  var ch = null, nextP = null, nextCh = null, idx = 0, playing = false, token = 0, wake = null, busy = false, loading = false, sayAt = 0;
+  var cloud = true, cloudFails = 0, cvi = Math.max(0, CLOUD_VOICES.map(function (v) { return v[0]; }).indexOf(store('nr-cvoice')));
+  var synth = window.speechSynthesis, voice = null, voices = [];
 
   function pickVoice() {
+    if (!synth) return;
     var vs = synth.getVoices();
     voices = vs.filter(function (v) { return /zh[-_]TW/i.test(v.lang); }).concat(vs.filter(function (v) { return /zh|cmn|yue/i.test(v.lang) && !/zh[-_]TW/i.test(v.lang); }));
     var saved = store('nr-voice');
     voice = voices.find(function (v) { return v.name === saved; }) || voices[0] || null;
   }
-  pickVoice(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = pickVoice;
+  pickVoice(); if (synth && synth.onvoiceschanged !== undefined) synth.onvoiceschanged = pickVoice;
 
-  function keepAwake() {
-    if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
+  // ---------- audio ----------
+  var player = new Audio(); player.preload = 'auto';
+  var cache = new Map();
+  function pct() { var n = Math.round((rate - 1) * 100); return (n >= 0 ? '+' : '') + n + '%'; }
+  function audioFor(text) {
+    var key = CLOUD_VOICES[cvi][0] + '|' + pct() + '|' + text;
+    if (cache.has(key)) return cache.get(key);
+    var url = TTS_URL + '?voice=' + CLOUD_VOICES[cvi][0] + '&rate=' + encodeURIComponent(pct()) + '&text=' + encodeURIComponent(text);
+    var get = function () {
+      return fetch(url).then(function (r) {
+        if (!r.ok || !/audio/.test(r.headers.get('content-type') || '')) throw new Error('tts ' + r.status);
+        return r.blob();
+      }).then(function (b) { return URL.createObjectURL(b); });
+    };
+    var pr = get().catch(get);
+    pr.catch(function () { cache.delete(key); });
+    cache.set(key, pr);
+    if (cache.size > 40) {
+      var old = cache.keys().next().value, op = cache.get(old); cache.delete(old);
+      op.then(function (u) { setTimeout(function () { URL.revokeObjectURL(u); }, 60000); }).catch(function () {});
+    }
+    return pr;
   }
-  document.addEventListener('visibilitychange', function () {
-    if (!playing) return;
-    keepAwake();
-    if (document.visibilityState === 'visible' && !busy && !synth.speaking) say(cks[ci] || '', function () { ci++; step(); });
-  });
+  function prefetch() {
+    if (!cloud || !ch) return;
+    for (var k = 1; k <= 2; k++) {
+      var j = idx + k;
+      if (j < ch.items.length) audioFor(ch.items[j].t).catch(function () {});
+      else if (nextCh && nextCh.items[j - ch.items.length]) audioFor(nextCh.items[j - ch.items.length].t).catch(function () {});
+    }
+  }
 
+  function deviceSay(text, my, done) {
+    if (!synth) { done(); return; }
+    var parts = chunks(text, 120), k = 0;
+    synth.cancel();
+    (function next() {
+      if (my !== token || !playing) return;
+      if (k >= parts.length) { done(); return; }
+      var u = new SpeechSynthesisUtterance(parts[k++]);
+      u.lang = 'zh-TW'; if (voice) u.voice = voice; u.rate = rate;
+      u.onend = u.onerror = function () { sayAt = Date.now(); next(); };
+      synth.speak(u);
+    })();
+  }
+
+  function say(text, done) {
+    var my = ++token; sayAt = Date.now();
+    var finish = function () { if (my === token && playing) done(); };
+    if (synth) synth.cancel();
+    player.pause();
+    if (!cloud) { deviceSay(text, my, finish); return; }
+    loading = true;
+    audioFor(text).then(function (url) {
+      loading = false;
+      if (my !== token || !playing) return;
+      cloudFails = 0;
+      player.onended = finish;
+      player.onerror = function () { if (my === token) deviceSay(text, my, finish); };
+      player.src = url; player.playbackRate = 1;
+      var pp = player.play();
+      if (pp) pp.catch(function () { if (my === token) deviceSay(text, my, finish); });
+      sayAt = Date.now();
+    }).catch(function () {
+      loading = false;
+      if (my !== token || !playing) return;
+      if (++cloudFails >= 3) { cloud = false; status('雲端語音連不上，暫時改用手機語音'); }
+      deviceSay(text, my, finish);
+    });
+  }
+
+  // ---------- keep page alive in background ----------
   function silentUrl() {
     var sr = 8000, n = sr * 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     function s(o, t) { for (var i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
@@ -119,28 +189,41 @@
   }
   var keep = new Audio(); keep.loop = true;
   try { keep.src = silentUrl(); } catch (e) {}
-  keep.addEventListener('timeupdate', function () {
-    if (playing && !busy && !synth.speaking && !synth.pending && Date.now() - sayAt > 4000) say(cks[ci] || '', function () { ci++; step(); });
+  function stalled() {
+    if (!playing || busy || loading || !ch || idx >= ch.items.length) return false;
+    if (Date.now() - sayAt < 8000) return false;
+    return cloud ? player.paused : !(synth && (synth.speaking || synth.pending));
+  }
+  keep.addEventListener('timeupdate', function () { if (stalled()) step(); });
+  function keepAwake() {
+    if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!playing) return;
+    keepAwake();
+    if (document.visibilityState === 'visible' && stalled()) step();
   });
   function media() {
     var ms = navigator.mediaSession; if (!ms) return;
     try {
       ms.metadata = new MediaMetadata({ title: ch ? ch.title : '小說朗讀', artist: '小說朗讀' });
       ms.playbackState = playing ? 'playing' : 'paused';
-      ms.setActionHandler('play', function () { go(pi); });
+      ms.setActionHandler('play', function () { go(curP()); });
       ms.setActionHandler('pause', pause);
-      ms.setActionHandler('nexttrack', function () { go(pi + 1); });
-      ms.setActionHandler('previoustrack', function () { go(pi - 1); });
+      ms.setActionHandler('nexttrack', function () { go(curP() + 1); });
+      ms.setActionHandler('previoustrack', function () { go(curP() - 1); });
     } catch (e) {}
   }
-  function keepOn() { keep.play().catch(function () {}); media(); }
   function pause() {
-    playing = false; token++; synth.cancel(); keep.pause(); playBtn.textContent = '播放'; media();
+    playing = false; token++; if (synth) synth.cancel(); player.pause(); keep.pause(); playBtn.textContent = '播放'; media();
     if (wake) wake.release().catch(function () {});
   }
 
-  function status(msg) { top.textContent = (ch ? ch.title : '') + '　語速 ' + rate.toFixed(1) + (msg ? '　' + msg : ''); }
+  // ---------- reading ----------
+  function voiceName() { return cloud ? CLOUD_VOICES[cvi][1] : '手機語音'; }
+  function status(msg) { top.textContent = (ch ? ch.title : '') + '　' + voiceName() + '　語速 ' + rate.toFixed(1) + (msg ? '　' + msg : ''); }
   function applyFont() { body.style.fontSize = font + 'px'; }
+  function curP() { return ch && ch.items[idx] ? ch.items[idx].p : 0; }
 
   function render() {
     body.innerHTML = '';
@@ -151,30 +234,25 @@
     });
     body.scrollTop = 0; document.title = ch.title; status(); media();
     try { if (location.origin === new URL(ch.url).origin) history.replaceState(null, '', ch.url); } catch (e) {}
+    nextCh = null;
     nextP = ch.next ? load(ch.next).catch(function () { return load(ch.next); }) : null;
+    if (nextP) nextP.then(function (c) { nextCh = c; }).catch(function () {});
   }
 
+  var lastMarked = -1;
   function mark() {
+    var p = curP(); if (p === lastMarked) return; lastMarked = p;
     var ps = body.children;
-    for (var i = 0; i < ps.length; i++) ps[i].className = i === pi ? 'on' : '';
-    if (ps[pi]) ps[pi].scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }
-
-  function say(text, done) {
-    var my = ++token; sayAt = Date.now();
-    synth.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-TW'; if (voice) u.voice = voice; u.rate = rate;
-    u.onend = u.onerror = function () { if (my === token && playing) done(); };
-    synth.speak(u);
+    for (var i = 0; i < ps.length; i++) ps[i].className = i === p ? 'on' : '';
+    if (ps[p]) ps[p].scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   function step() {
     if (!playing) return;
-    if (pi >= ch.paras.length) return nextChapter();
-    if (ci === 0) { cks = chunks(ch.paras[pi]); mark(); }
-    if (ci >= cks.length) { pi++; ci = 0; return step(); }
-    say(cks[ci], function () { ci++; step(); });
+    if (idx >= ch.items.length) return nextChapter();
+    mark();
+    say(ch.items[idx].t, function () { idx++; step(); });
+    prefetch();
   }
 
   function nextChapter() {
@@ -182,8 +260,8 @@
     status('載入下一章…'); busy = true;
     nextP.then(function (c) {
       busy = false;
-      if (!c.paras.length) throw new Error('empty');
-      ch = c; pi = 0; ci = 0; render(); step();
+      if (!c.items.length) throw new Error('empty');
+      ch = c; idx = 0; lastMarked = -1; render(); step();
     }).catch(function () {
       busy = false; status('下一章載入失敗');
       say('下一章載入失敗，請按播放再試一次', function () { pause(); });
@@ -191,21 +269,28 @@
     });
   }
 
-  function go(i) { pi = Math.max(0, Math.min(i, ch.paras.length - 1)); ci = 0; playing = true; playBtn.textContent = '暫停'; keepAwake(); keepOn(); step(); }
+  function go(p) {
+    p = Math.max(0, Math.min(p, ch.paras.length - 1));
+    idx = 0; while (idx < ch.items.length - 1 && ch.items[idx].p < p) idx++;
+    lastMarked = -1; playing = true; playBtn.textContent = '暫停';
+    keepAwake(); keep.play().catch(function () {}); media(); step();
+  }
 
   box.querySelector('#nr-bar').onclick = function (e) {
     var a = e.target.getAttribute('data-a'); if (!a) return;
-    if (a === 'play') {
-      if (playing) pause(); else go(pi);
-    }
-    if (a === 'prev') go(pi - 1);
-    if (a === 'next') go(pi + 1);
-    if (a === 'slow' || a === 'fast') { rate = Math.max(0.5, Math.min(2.5, rate + (a === 'fast' ? 0.1 : -0.1))); store('nr-rate', rate); status(); if (playing) go(pi); }
+    if (a === 'play') { if (playing) pause(); else go(curP()); }
+    if (a === 'prev') go(curP() - 1);
+    if (a === 'next') go(curP() + 1);
+    if (a === 'slow' || a === 'fast') { rate = Math.round(Math.max(0.5, Math.min(2, rate + (a === 'fast' ? 0.1 : -0.1))) * 10) / 10; store('nr-rate', rate); status(); if (playing) go(curP()); }
     if (a === 'voice') {
-      if (!voices.length) { status('這支手機沒有其他中文聲音'); return; }
-      var vi = (voices.indexOf(voice) + 1) % voices.length; voice = voices[vi]; store('nr-voice', voice.name);
-      status('聲音 ' + (vi + 1) + '/' + voices.length + '：' + voice.name);
-      if (playing) go(pi); else say('這是第' + (vi + 1) + '個聲音，聽聽看喜不喜歡。', function () {});
+      if (cloud) {
+        cvi = (cvi + 1) % CLOUD_VOICES.length; store('nr-cvoice', CLOUD_VOICES[cvi][0]);
+      } else if (voices.length) {
+        voice = voices[(voices.indexOf(voice) + 1) % voices.length]; store('nr-voice', voice.name);
+      }
+      status();
+      if (playing) go(curP());
+      else { playing = true; say('你好，我是' + voiceName().replace(/（.*/, '') + '，聽聽看喜不喜歡。', function () { pause(); }); }
       return;
     }
     if (a === 'small' || a === 'large') { font = Math.max(16, Math.min(48, font + (a === 'large' ? 2 : -2))); store('nr-font', font); applyFont(); }
@@ -216,7 +301,8 @@
   applyFont();
   ch = extract(document, location.href);
   if (!ch.paras.length) { top.textContent = '這個頁面找不到小說正文'; return; }
-  render(); playing = false; playBtn.textContent = '播放';
+  render(); playBtn.textContent = '播放';
+  audioFor(ch.items[0].t).catch(function () {});
   var startBox = box.querySelector('#nr-start');
   startBox.querySelector('button').onclick = function () { startBox.remove(); go(0); };
 })();
