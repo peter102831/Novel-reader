@@ -16,3 +16,11 @@ javascript:(function(){function L(u,f){var s=document.createElement('script');s.
 - `reader.js`：原始碼
 - `reader.core.js`：壓縮後的朗讀程式
 - `reader.min.js`：書籤載入的小檔案，每次都去抓最新的 `reader.core.js`，所以更新程式後不必改書籤
+
+## 雲端語音服務（tts/worker.js）
+
+部署在 Cloudflare Workers 上的小服務，透過微軟 Edge 的線上語音產生自然的台灣口音語音（例如 `zh-TW-HsiaoChenNeural`），回傳 mp3。
+驗證碼算法移植自開源專案 [rany2/edge-tts](https://github.com/rany2/edge-tts)。這屬於非官方用法，微軟可能隨時更改。
+
+- `GET /tts?text=要唸的字&voice=zh-TW-HsiaoChenNeural&rate=+0%` → mp3
+- 可在 Cloudflare 設定 `ACCESS_KEY` 密碼，之後請求需帶 `key=` 參數
