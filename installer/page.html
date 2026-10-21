@@ -1,0 +1,102 @@
+<title>小說朗讀書籤</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one calm column, very large type, one bright copy button as the focal point */
+:root{
+  --bg:#fbfaf6; --fg:#14161a; --muted:#4a4f58; --panel:#eef0f3; --accent:#1f4fd1; --accent-fg:#ffffff; --ok:#17733a; --line:#cfd4dc;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#101215;--fg:#f4f4f1;--muted:#c3c7ce;--panel:#1d2127;--accent:#ffd75e;--accent-fg:#101215;--ok:#6fdc96;--line:#3a404a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101215;--fg:#f4f4f1;--muted:#c3c7ce;--panel:#1d2127;--accent:#ffd75e;--accent-fg:#101215;--ok:#6fdc96;--line:#3a404a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:22px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+main{max-width:34em;margin:0 auto;display:flex;flex-direction:column;gap:32px}
+h1{font-family:var(--display);font-size:2em;line-height:1.25;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-size:1.35em;margin:0 0 8px;text-wrap:balance}
+p{margin:0}
+.lead{color:var(--muted)}
+#copy{width:100%;min-height:84px;font-size:1.2em;font-weight:700;border:0;border-radius:14px;background:var(--accent);color:var(--accent-fg);cursor:pointer;font-family:var(--body)}
+#copy:focus-visible,summary:focus-visible{outline:4px solid var(--fg);outline-offset:4px}
+#msg{font-weight:700;color:var(--ok);min-height:1.6em}
+#code{width:100%;height:5em;font-size:14px;border:2px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);word-break:break-all;padding:8px;box-sizing:border-box}
+ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:12px}
+details{border-top:2px solid var(--line);padding-top:16px}
+summary{font-family:var(--display);font-size:1.35em;font-weight:700;cursor:pointer;min-height:48px}
+details[open] summary{margin-bottom:12px}
+b.k{background:var(--panel);padding:0 .35em;border-radius:6px}
+.note{background:var(--panel);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+</style>
+
+<main>
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <h1>小說朗讀書籤</h1>
+    <p class="lead">在小說的章節頁按一下這個書籤，手機就會用大字顯示正文並開始朗讀，讀完自動接下一章。</p>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>第一步：複製代碼</h2>
+    <button id="copy" type="button">複製書籤代碼</button>
+    <p id="msg" role="status" aria-live="polite"></p>
+    <label for="code" style="color:var(--muted);font-size:.85em">如果按鈕沒反應，長按下面這格，選「全選」再「拷貝」：</label>
+    <textarea id="code" readonly>__BM__</textarea>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>第二步：存成書籤（Android Chrome）</h2>
+    <ol>
+      <li>在 Chrome 打開任一網頁，按右上角<b class="k">⋮</b>，再按<b class="k">☆</b>加入書籤。</li>
+      <li>畫面下方會跳出「已加入書籤」，按旁邊的<b class="k">編輯</b>。</li>
+      <li>名稱改成<b class="k">朗讀</b>。網址那一格全部刪掉，貼上剛才複製的代碼。</li>
+      <li>按左上角的返回箭頭，會自動儲存。</li>
+    </ol>
+    <p class="lead">已經裝過舊版？按 <b class="k">⋮</b> → <b class="k">書籤</b>，在「朗讀」右邊按 <b class="k">⋮</b> → <b class="k">編輯</b>，把網址換成新代碼即可。</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>讓鎖定後也能繼續唸</h2>
+    <ol>
+      <li>打開手機的<b class="k">設定</b> → <b class="k">應用程式</b> → <b class="k">Chrome</b> → <b class="k">電池</b>，改成<b class="k">不受限制</b>（各品牌名稱略有不同，也可能叫「允許背景活動」）。</li>
+      <li>開始朗讀後，下拉通知列應該會看到「小說朗讀」的播放控制，代表背景模式有啟動。</li>
+      <li>鎖定螢幕聽聽看。如果幾秒後就停了，代表你的手機不支援這個技巧，請告訴我。</li>
+    </ol>
+  </section>
+
+  <details>
+    <summary>iPhone 的設定方式（給家人朋友參考）</summary>
+    <ol>
+      <li>在 Safari 隨便打開一個網頁，按下方的<b class="k">分享</b>按鈕，選<b class="k">加入書籤</b>。</li>
+      <li>名稱改成<b class="k">朗讀</b>，按<b class="k">儲存</b>。</li>
+      <li>打開<b class="k">書籤</b>，按<b class="k">編輯</b>，點剛才的「朗讀」。</li>
+      <li>把網址那一格清空，貼上剛才複製的代碼，按<b class="k">完成</b>。</li>
+    </ol>
+  </details>
+
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>第三步：開始聽書</h2>
+    <ol>
+      <li>打開小說的任一章，例如提莫書屋的第 1 章。</li>
+      <li>點一下網址列，打<b class="k">朗讀</b>兩個字，點下方出現的那個書籤（星號圖示）。從書籤選單裡點不會有反應，一定要從網址列點。</li>
+      <li>畫面會出現一個很大的黃色按鈕「點這裡開始朗讀」，點下去就開始唸了。</li>
+    </ol>
+  </section>
+
+  <section class="note">
+    <h2>朗讀畫面的按鈕</h2>
+    <p><b>暫停 / 播放</b>：黃色大按鈕。<b>上一段、下一段</b>：跳段落。<b>慢一點、快一點</b>：調語速。<b>字小、字大</b>：調字體。點任一段文字，會從那段開始唸。</p>
+    <p>聲音是微軟的台灣神經網路語音，按「換聲音」可以在曉臻、曉雨（女聲）和雲哲（男聲）之間切換。雲端語音連不上時，會自動改用手機內建的聲音。語速、字體大小和聲音都會記住，下次不用再調。鎖定畫面和通知列的播放控制也能暫停、跳段落。如果朗讀在背景被停掉，回到畫面時會自動接著唸。</p>
+    <p>提莫書屋會把大約 150 個常用字藏成韓文字，書籤會自動換回中文。如果網站哪天換了藏字方式，聽到怪字或漏字時告訴我，我再更新。</p>
+  </section>
+</main>
+
+<script>
+(function(){
+  var btn=document.getElementById('copy'),ta=document.getElementById('code'),msg=document.getElementById('msg');
+  function sel(){ta.focus();ta.select();ta.setSelectionRange(0,ta.value.length);}
+  btn.addEventListener('click',function(){
+    var done=function(){msg.textContent='已複製，請接著做第二步。';};
+    try{navigator.clipboard.writeText(ta.value).then(done,function(){sel();msg.textContent='請長按下方選取的文字，選「拷貝」。';});}
+    catch(e){sel();msg.textContent='請長按下方選取的文字，選「拷貝」。';}
+  });
+})();
+</script>

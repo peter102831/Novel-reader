@@ -1,0 +1,12 @@
+{
+  "name": "novel-reader",
+  "private": true,
+  "scripts": {
+    "build": "terser reader.js -c -m --format ascii_only=true -o reader.core.js",
+    "test": "node test/sim.js && node test/sim.js fail"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "terser": "^5.36.0"
+  }
+}
