@@ -10,7 +10,7 @@
 ## 書籤代碼
 
 ```
-javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://raw.githack.com/peter102831/Novel-reader/main/reader.core.js?t='+Date.now(),function(){L('https://cdn.jsdelivr.net/gh/peter102831/Novel-reader@main/reader.core.js')})})()
+javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://novel-reader.a1028318.workers.dev/reader.js?t='+Date.now(),function(){L('https://raw.githack.com/peter102831/Novel-reader/main/reader.core.js?t='+Date.now())})})()
 ```
 
 - `reader.js`：原始碼
@@ -22,5 +22,6 @@ javascript:(function(){function L(u,f){var s=document.createElement('script');s.
 部署在 Cloudflare Workers 上的小服務，透過微軟 Edge 的線上語音產生自然的台灣口音語音（例如 `zh-TW-HsiaoChenNeural`），回傳 mp3。
 驗證碼算法移植自開源專案 [rany2/edge-tts](https://github.com/rany2/edge-tts)。這屬於非官方用法，微軟可能隨時更改。
 
+- `GET /reader.js` → 最新版朗讀程式（書籤從這裡載入，GitHub 更新後 Cloudflare 會自動重新部署）
 - `GET /tts?text=要唸的字&voice=zh-TW-HsiaoChenNeural&rate=+0%` → mp3
 - 可在 Cloudflare 設定 `ACCESS_KEY` 密碼，之後請求需帶 `key=` 參數
