@@ -10,7 +10,7 @@
 ## 書籤代碼
 
 ```
-javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://cdn.jsdelivr.net/gh/peter102831/Novel-reader@main/reader.min.js',function(){L('https://raw.githack.com/peter102831/Novel-reader/main/reader.min.js')})})()
+javascript:(function(){function L(u,f){var s=document.createElement('script');s.src=u;s.onerror=f;document.body.appendChild(s)}L('https://raw.githack.com/peter102831/Novel-reader/main/reader.core.js?t='+Date.now(),function(){L('https://cdn.jsdelivr.net/gh/peter102831/Novel-reader@main/reader.core.js')})})()
 ```
 
 - `reader.js`：原始碼
